@@ -1,11 +1,13 @@
 (function () {
   'use strict';
   const M = window.EcoModel;
-  const STORAGE = 'ecoluxe-demo-v1';
+  const STORAGE = 'ecoluxe-demo-v2';
   const stages = ['production', 'ready', 'scheduled', 'delivered', 'installation', 'accepted'];
   const labels = { production: 'В производстве', ready: 'Готов к выезду', scheduled: 'Выезд назначен', delivered: 'Доставлен', installation: 'На сборке', accepted: 'Принят' };
   const shortLabels = ['Производство', 'Комплект', 'Доставка', 'На объекте', 'Сборка', 'Приёмка'];
-  const pages = { overview: 'Обзор', orders: 'Заказы', production: 'Производство', delivery: 'Доставка', assembly: 'Сборка', system: 'Дизайн-система' };
+  const pages = { overview: 'Обзор', orders: 'Заказы', comms: 'Коммуникации', production: 'Производство', delivery: 'Доставка', assembly: 'Сборка', system: 'Дизайн-система' };
+  const roleLabels = { client: 'Клиент', manager: 'Менеджер', production: 'Производство', logistics: 'Логистика', crew: 'Бригада' };
+  const channelLabels = { hub: 'Центр', whatsapp: 'WhatsApp', call: 'Звонок', email: 'Email' };
   const paths = {
     overview: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
     orders: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v3h6V3M9 11h6M9 15h6"/>',
@@ -13,6 +15,7 @@
     delivery: '<path d="M2 6h12v12H2zM14 10h4l4 4v4h-8M17 10v4h5"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>',
     assembly: '<path d="m14 6 4-3 3 3-3 4-3-1-9 12-3-3 11-9-1-3ZM3 3l4 1 2 4-2 2-4-2V3M15 15l6 6"/>',
     system: '<circle cx="8" cy="8" r="5"/><rect x="12" y="12" width="9" height="9" rx="2"/><path d="M5 17h4M7 15v4M16 5h4M18 3v4"/>',
+    comms: '<path d="M4 6h11a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H10l-4 3v-3H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/><path d="M9 11h6M9 8h4"/>',
     arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
     search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
     check: '<path d="m5 12 4 4L19 6"/>',
@@ -45,7 +48,7 @@
       } catch (_) { loadNotice = 'Сохранённые данные повреждены. Загружено исходное демо.'; }
     }
   } catch (_) { loadNotice = 'Локальное сохранение недоступно. Демо работает до закрытия страницы.'; }
-  const ui = { page: 'overview', search: '', filter: 'all', overviewFilter: 'all', selected: null };
+  const ui = { page: 'overview', search: '', filter: 'all', overviewFilter: 'all', selected: null, commsOrderId: 'ЭК-1048', commsMobileShowThread: false, composeRole: 'manager' };
   const app = document.querySelector('#app');
   const detail = document.querySelector('#detail');
   let toastTimer;
@@ -64,10 +67,18 @@
   }
 
   function render() {
-    const nav = Object.entries(pages).map(([key, label]) => `<a href="#${key}" class="${ui.page === key ? 'active' : ''}" ${ui.page === key ? 'aria-current="page"' : ''}>${icon(key)}<span>${label}</span>${key === 'orders' ? `<span class="nav-count">${state.orders.length}</span>` : ''}</a>`);
+    const unread = M.getUnreadCount(state);
+    const nav = Object.entries(pages).map(([key, label]) => {
+      let badge = '';
+      if (key === 'orders') badge = `<span class="nav-count">${state.orders.length}</span>`;
+      if (key === 'comms' && unread) badge = `<span class="nav-count unread">${unread}</span>`;
+      return `<a href="#${key}" class="${ui.page === key ? 'active' : ''}" ${ui.page === key ? 'aria-current="page"' : ''}>${icon(key)}<span>${label}</span>${badge}</a>`;
+    });
+    const mainNav = nav.slice(0, -1).join('');
+    const systemNav = nav[nav.length - 1];
     app.innerHTML = `<div class="shell">
       <button class="mobile-scrim" data-command="menu-close" aria-label="Закрыть меню"></button>
-      <aside class="sidebar"><a href="#overview" class="brand" aria-label="ЭКОЛЮКС — обзор"><span class="brand-mark">Э</span><div><div class="brand-name">ЭКОЛЮКС</div><div class="brand-sub">Рабочее пространство</div></div></a><div class="nav-label">Управление заказами</div><nav class="nav" aria-label="Главное меню">${nav.slice(0, 5).join('')}</nav><div class="sidebar-bottom"><nav class="nav" aria-label="Материалы концепта">${nav[5]}</nav><div class="sidebar-note"><span class="eyebrow">Одна кухня. Весь путь.</span><p>От готового комплекта<br>до последней регулировки.</p><button class="text-link" data-command="about">О концепте ${icon('arrow')}</button></div><div class="profile"><span class="avatar">Э</span><div><strong>Команда ЭКОЛЮКС</strong><p>Демонстрационный доступ</p></div></div></div></aside>
+      <aside class="sidebar"><a href="#overview" class="brand" aria-label="ЭКОЛЮКС — обзор"><span class="brand-mark">Э</span><div><div class="brand-name">ЭКОЛЮКС</div><div class="brand-sub">Рабочее пространство</div></div></a><div class="nav-label">Управление заказами</div><nav class="nav" aria-label="Главное меню">${mainNav}</nav><div class="sidebar-bottom"><nav class="nav" aria-label="Материалы концепта">${systemNav}</nav><div class="sidebar-note"><span class="eyebrow">Одна кухня. Весь путь.</span><p>От готового комплекта<br>до последней регулировки.</p><button class="text-link" data-command="about">О концепте ${icon('arrow')}</button></div><div class="profile"><span class="avatar">Э</span><div><strong>Команда ЭКОЛЮКС</strong><p>Демонстрационный доступ</p></div></div></div></aside>
       <div class="workspace"><header class="topbar"><div class="breadcrumbs"><button class="icon-button mobile-menu" data-command="menu" aria-label="Открыть меню" aria-expanded="false">${icon('menu')}</button><span>Рабочее пространство</span><span class="separator">/</span><span>${pages[ui.page]}</span></div><div class="topbar-actions"><span class="topbar-date">Сценарий · сентябрь 2026</span><span class="pill dot">Концепт · тестовые данные</span><button class="icon-button" data-command="reset" aria-label="Сбросить демо" title="Сбросить демо">${icon('reset')}</button></div></header><main id="main" class="main" tabindex="-1">${renderPage()}<footer class="workspace-footer"><span>ЭКОЛЮКС / Концепция управления производством, доставкой и сборкой</span><span>Все заказы вымышлены · прогресс сохраняется в этом браузере</span></footer></main></div></div>`;
     document.title = `${pages[ui.page]} · ЭКОЛЮКС`;
     syncMenuAccessibility();
@@ -80,6 +91,7 @@
   function renderPage() {
     switch (ui.page) {
       case 'orders': return renderOrders();
+      case 'comms': return renderComms();
       case 'production': return renderProduction();
       case 'delivery': return renderDelivery();
       case 'assembly': return renderAssembly();
@@ -105,7 +117,7 @@
     const metrics = [
       ['orders', 'В работе', s.active, 'из 6 демонстрационных заказов', ''],
       ['production', 'Готовы к выезду', s.ready, '<em>Комплектность подтверждена</em>', ''],
-      ['delivery', 'Запланировано выездов', s.deliveries, 'доставка и монтажные работы', ''],
+      ['comms', 'Открытые диалоги', s.openDialogs, s.unreadComms ? `<em><a class="metric-link" href="#comms">Непрочитанных: ${s.unreadComms}</a></em>` : '<em><a class="metric-link" href="#comms">Единый центр по заказу</a></em>', ''],
       ['alert', 'Требуют внимания', state.orders.filter(o => !M.getReadiness(o).ready || o.issues.some(i => !i.resolved)).length, `<em>Комплектация: ${incomplete} · замечания: ${s.issues}</em>`, 'attention']
     ];
     const r = M.getReadiness(main);
@@ -117,7 +129,7 @@
       <div class="overview-grid"><div class="left-column"><section class="panel route-panel"><div class="panel-head"><h2>Маршрут заказа</h2><span class="caption">Один процесс, пять этапов</span></div><div class="route-strip">${[['Производство', countStage('production')], ['Комплект готов', countStage('ready')], ['Доставка', countStage('scheduled') + countStage('delivered')], ['Сборка', countStage('installation')], ['Приёмка', countStage('accepted')]].map(([l, n], i) => `<div class="route-node"><span class="route-number">${String(i + 1).padStart(2, '0')}</span><strong>${l}</strong><small>Заказов: ${n}</small></div>`).join('')}</div></section>
       <section class="panel"><div class="panel-head"><h2>Заказы в работе <span class="count">${s.active}</span></h2><a class="text-link" href="#orders">Все заказы ${icon('arrow')}</a></div><div class="order-list-head"><div class="filter-chips">${[['all', 'Все в работе'], ['production', 'Производство'], ['attention', 'Требуют внимания']].map(([key, l]) => `<button class="chip ${ui.overviewFilter === key ? 'active' : ''}" data-overview-filter="${key}" aria-pressed="${ui.overviewFilter === key}">${l}</button>`).join('')}</div></div>${orderTable(list)}<div class="table-footer"><span>Показано: ${list.length} · изменения сохраняются</span><button class="text-link" data-order="ЭК-1048">Открыть главный заказ ↗</button></div></section>
       <section class="panel"><div class="panel-head"><h2>Ближайшие выезды</h2><a class="text-link" href="#delivery">План выездов ${icon('arrow')}</a></div><div class="agenda">${visits.length ? visits.map(o => `<div class="agenda-item"><div class="agenda-date">${new Date(`${o.schedule.date}T12:00`).getDate()}<small>${new Date(`${o.schedule.date}T12:00`).toLocaleDateString('ru-RU', { month: 'short' })}</small></div><div><h3>${esc(o.schedule.crew)} · ${o.schedule.time}</h3><p>${esc(title(o))} / ${esc(o.district)}</p><button class="text-link" data-order="${o.id}">${o.id} ↗</button></div></div>`).join('') : '<div class="empty">Выездов в работе нет. Готовым заказам можно назначить доставку.</div>'}</div></section></div>
-      <aside class="right-column" aria-label="Фокус внимания"><section class="focus-card"><div class="focus-photo"><img src="${photo(main)}" alt="Кухня из каталога ЭКОЛЮКС, иллюстрация концепта"><span class="photo-label">Заказ в фокусе</span><span class="photo-number">${main.id}</span></div><div class="focus-body"><span class="eyebrow">От детали до результата</span><h2>${esc(title(main))}</h2><p>${esc(main.material)}<br>${esc(main.dimensions)} · ${esc(main.district)}</p><div class="focus-warning">${icon(main.stage === 'accepted' ? 'checkCircle' : 'clock')}<div>${nextText}<small>${main.stage === 'production' ? `Готово ${r.done} из ${r.total} групп комплекта` : labels[main.stage]}</small></div></div><button class="button light" data-order="ЭК-1048">Открыть заказ ${icon('arrow')}</button></div></section><section class="panel mini-panel"><h3>Без потерь между этапами</h3><p>Цех подтверждает комплект.<br>Логист назначает выезд.<br>Бригада закрывает работы.</p><div class="team-row"><div class="team-avatars"><span class="avatar">Ц</span><span class="avatar">Л</span><span class="avatar">С</span></div><span class="caption">Общий статус<br>для всей команды</span></div></section></aside></div>`;
+      <aside class="right-column" aria-label="Фокус внимания"><section class="focus-card"><div class="focus-photo"><img src="${photo(main)}" alt="Кухня из каталога ЭКОЛЮКС, иллюстрация концепта"><span class="photo-label">Заказ в фокусе</span><span class="photo-number">${main.id}</span></div><div class="focus-body"><span class="eyebrow">От детали до результата</span><h2>${esc(title(main))}</h2><p>${esc(main.material)}<br>${esc(main.dimensions)} · ${esc(main.district)}</p><div class="focus-warning">${icon(main.stage === 'accepted' ? 'checkCircle' : 'clock')}<div>${nextText}<small>${main.stage === 'production' ? `Готово ${r.done} из ${r.total} групп комплекта` : labels[main.stage]}</small></div></div><button class="button light" data-order="ЭК-1048">Открыть заказ ${icon('arrow')}</button></div></section><section class="panel mini-panel"><h3>Без потерь между этапами</h3><p>Цех подтверждает комплект.<br>Логист назначает выезд.<br>Бригада закрывает работы.</p><div class="team-row"><div class="team-avatars"><span class="avatar">Ц</span><span class="avatar">Л</span><span class="avatar">С</span></div><span class="caption">Общий статус<br>для всей команды</span></div></section><section class="panel mini-panel comms-teaser"><h3>Открытые диалоги</h3><p>Один заказ — одна лента. Менеджер, цех, логистика и клиент пишут в контексте этапа.</p><a class="text-link" href="#comms">Открыть центр коммуникаций ${icon('arrow')}</a>${s.unreadComms ? `<p class="caption" style="margin-top:12px">Непрочитанных: ${s.unreadComms}</p>` : ''}</section></aside></div>`;
   }
 
   function filteredOrders() {
@@ -127,6 +139,43 @@
 
   function renderOrders() {
     return `${heading('Единая карточка проекта', 'Каждый заказ на виду.', 'Комплект, сроки, выезд и сборка связаны с одним проектом.')}<div class="toolbar"><label class="search">${icon('search')}<input id="order-search" type="search" value="${esc(ui.search)}" placeholder="Номер, кухня или клиент" aria-label="Поиск заказов"></label><select id="status-filter" class="filter-select" aria-label="Фильтр по этапу"><option value="all">Все этапы</option>${stages.map(s => `<option value="${s}" ${ui.filter === s ? 'selected' : ''}>${labels[s]}</option>`).join('')}</select><span class="caption" id="result-count">Найдено: ${filteredOrders().length}</span></div><section id="filter-results" class="panel full-table">${orderTable(filteredOrders(), true)}</section>`;
+  }
+
+
+  function formatMsgTime(iso) {
+    return new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function channelChip(channel) {
+    if (channel === 'hub') return '';
+    return `<span class="channel-chip ${channel}">${channelLabels[channel] || channel}</span>`;
+  }
+
+  function renderMessageBubble(m) {
+    if (m.kind === 'system') {
+      return `<div class="comms-system"><span>${esc(m.text)}</span><time>${formatMsgTime(m.time)}</time></div>`;
+    }
+    const side = m.role === 'client' ? 'client' : 'internal';
+    return `<article class="comms-bubble ${side} role-${m.role}"><div class="comms-bubble-meta"><strong>${esc(m.author)}</strong><span class="role-tag">${roleLabels[m.role] || m.role}</span>${channelChip(m.channel)}<time>${formatMsgTime(m.time)}</time></div><p>${esc(m.text)}</p></article>`;
+  }
+
+  function renderComms() {
+    const threads = M.getThreadMeta(state);
+    if (!ui.commsOrderId || !threads.some(t => t.orderId === ui.commsOrderId)) {
+      ui.commsOrderId = threads[0]?.orderId || null;
+    }
+    const active = threads.find(t => t.orderId === ui.commsOrderId) || null;
+    const mobileClass = ui.commsMobileShowThread && active ? 'show-thread' : '';
+    const list = threads.length ? threads.map(t => {
+      const preview = t.last.kind === 'system' ? t.last.text : `${roleLabels[t.last.role] || ''}: ${t.last.text}`;
+      return `<button type="button" class="comms-thread ${t.orderId === ui.commsOrderId ? 'active' : ''}" data-comms-thread="${t.orderId}"><div class="comms-thread-top"><span class="mono">${t.orderId}</span>${badge(t.order.stage)}${t.unread ? `<span class="unread-dot" title="Непрочитано">${t.unread}</span>` : ''}</div><strong>${esc(title(t.order))}</strong><p>${esc(preview.slice(0, 110))}${preview.length > 110 ? '…' : ''}</p></button>`;
+    }).join('') : '<div class="empty"><h3>Диалогов пока нет</h3><p>Сообщения появятся вместе с активными заказами.</p></div>';
+
+    const threadPane = active ? `<div class="comms-thread-pane"><div class="comms-thread-head"><button type="button" class="button small comms-back" data-command="comms-back">${icon('arrow')} К списку</button><div><span class="mono">${active.orderId}</span><h2>${esc(title(active.order))}</h2><p>${esc(active.order.client)} · ${labels[active.order.stage]}</p></div><button type="button" class="button small" data-order="${active.orderId}">Карточка заказа</button></div><div class="comms-messages" id="comms-messages">${active.messages.map(renderMessageBubble).join('')}</div><form id="comms-form" class="comms-composer" data-comms-order="${active.orderId}"><label class="field compose-role">От имени<select name="role" id="comms-role">${Object.entries(roleLabels).map(([k, l]) => `<option value="${k}" ${ui.composeRole === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label class="field compose-text">Сообщение<textarea name="text" id="comms-text" rows="2" maxlength="800" required placeholder="Ответ в единый центр по заказу…"></textarea></label><button class="button primary" type="submit">Отправить в центр</button><p class="caption">Новые ответы всегда идут через хаб · без WhatsApp и звонков</p></form></div>` : '<div class="comms-thread-pane empty"><h3>Выберите диалог</h3><p>Слева — ленты по заказам.</p></div>';
+
+    return `${heading('Единый центр коммуникаций', 'Один заказ — одна лента.', 'Производство, доставка, монтаж и клиент в одном месте.', `<a class="button" href="#orders">К заказам ${icon('arrow')}</a>`)}
+      <div class="callout comms-callout">${icon('comms')}<div><h3>Раньше: звонки и WhatsApp → Теперь: единый центр по карточке заказа</h3><p>История ЭК-1048 показывает, как вопрос клиента из мессенджера попадает в хаб и дальше виден цеху и логистике в контексте этапа.</p></div></div>
+      <div class="comms-layout ${mobileClass}"><aside class="panel comms-list" aria-label="Список диалогов"><div class="panel-head"><h2>Диалоги <span class="count">${threads.length}</span></h2>${M.getUnreadCount(state) ? `<span class="pill"> непрочитано: ${M.getUnreadCount(state)}</span>` : ''}</div><div class="comms-thread-list">${list}</div></aside>${threadPane}</div>`;
   }
 
   function renderProduction() {
@@ -177,7 +226,7 @@
     const focused = detail.contains(document.activeElement) ? document.activeElement.id : '';
     const previousScroll = detail.scrollTop;
     detail.className = 'detail-dialog';
-    detail.innerHTML = `<header class="detail-header"><div class="detail-header-top"><span class="eyebrow">${o.id} / Тестовый заказ</span><button class="icon-button" id="close-detail" data-command="close-detail" aria-label="Закрыть карточку">${icon('close')}</button></div><div class="detail-header-bottom"><div><h2 id="detail-title">${esc(o.name)}</h2><p>${esc(o.client)} · ${esc(o.district)} · план до ${date(o.due, true)}</p></div>${badge(o.stage)}</div></header><div class="detail-steps" aria-label="Этапы заказа">${stages.map((s, i) => `<div class="detail-step ${i === current ? 'current' : i < current ? 'complete' : ''}" ${i === current ? 'aria-current="step"' : ''}><i>${i < current ? '✓' : i + 1}</i><span>${shortLabels[i]}</span></div>`).join('')}</div><div class="detail-layout"><div class="detail-main">${actionSection(o)}</div><aside class="detail-aside"><img class="detail-photo" src="${photo(o)}" alt="Референс кухни из каталога ЭКОЛЮКС"><section class="detail-section"><h3>Паспорт проекта</h3><div class="properties"><div class="property"><span>Габариты</span><strong>${esc(o.dimensions)}</strong></div><div class="property"><span>Материал</span><strong>${esc(o.material)}</strong></div><div class="property"><span>Стоимость</span><strong>${money(o.amount)}</strong></div><div class="property"><span>Комплект</span><strong>${M.getReadiness(o).done}/${M.getReadiness(o).total} групп</strong></div></div><p class="help">Сумма и спецификация придуманы для демонстрации. Фото — референс каталога.</p></section><section class="detail-section"><h3>История заказа</h3><ol class="history">${o.history.slice().reverse().slice(0, 8).map(h => `<li><time>${new Date(h.time).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time>${esc(h.text)}</li>`).join('')}</ol></section></aside></div>`;
+    detail.innerHTML = `<header class="detail-header"><div class="detail-header-top"><span class="eyebrow">${o.id} / Тестовый заказ</span><button class="icon-button" id="close-detail" data-command="close-detail" aria-label="Закрыть карточку">${icon('close')}</button></div><div class="detail-header-bottom"><div><h2 id="detail-title">${esc(o.name)}</h2><p>${esc(o.client)} · ${esc(o.district)} · план до ${date(o.due, true)}</p></div>${badge(o.stage)}</div></header><div class="detail-steps" aria-label="Этапы заказа">${stages.map((s, i) => `<div class="detail-step ${i === current ? 'current' : i < current ? 'complete' : ''}" ${i === current ? 'aria-current="step"' : ''}><i>${i < current ? '✓' : i + 1}</i><span>${shortLabels[i]}</span></div>`).join('')}</div><div class="detail-layout"><div class="detail-main">${actionSection(o)}</div><aside class="detail-aside"><img class="detail-photo" src="${photo(o)}" alt="Референс кухни из каталога ЭКОЛЮКС"><section class="detail-section"><h3>Паспорт проекта</h3><div class="properties"><div class="property"><span>Габариты</span><strong>${esc(o.dimensions)}</strong></div><div class="property"><span>Материал</span><strong>${esc(o.material)}</strong></div><div class="property"><span>Стоимость</span><strong>${money(o.amount)}</strong></div><div class="property"><span>Комплект</span><strong>${M.getReadiness(o).done}/${M.getReadiness(o).total} групп</strong></div></div><p class="help">Сумма и спецификация придуманы для демонстрации. Фото — референс каталога.</p></section><section class="detail-section"><h3>Коммуникации</h3>${(() => { const msgs = M.getComms(state, o.id).slice(-2); if (!msgs.length) return '<p class="help">Пока нет сообщений в центре.</p>'; return `<div class="detail-comms">${msgs.map(m => `<div class="detail-comms-item"><strong>${esc(m.kind === 'system' ? 'Система' : m.author)}</strong><span>${esc(m.text.slice(0, 90))}${m.text.length > 90 ? '…' : ''}</span></div>`).join('')}</div>`; })()}<a class="text-link" href="#comms" data-command="open-comms" data-comms-thread="${o.id}" style="margin-top:14px">Открыть центр ${icon('arrow')}</a></section><section class="detail-section"><h3>История заказа</h3><ol class="history">${o.history.slice().reverse().slice(0, 8).map(h => `<li><time>${new Date(h.time).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time>${esc(h.text)}</li>`).join('')}</ol></section></aside></div>`;
     detail.scrollTop = previousScroll;
     if (focused) { const nextFocus = document.getElementById(focused) || detail.querySelector('#issue-text') || detail.querySelector('#close-detail'); nextFocus?.focus({ preventScroll: true }); }
   }
@@ -234,6 +283,24 @@
     const target = event.target.closest('button, a');
     if (!target) return;
     if (target.classList.contains('skip-link')) { event.preventDefault(); document.querySelector('#main').focus(); return; }
+    if (target.dataset.commsThread) {
+      event.preventDefault();
+      ui.commsOrderId = target.dataset.commsThread;
+      ui.commsMobileShowThread = true;
+      const marked = M.markThreadRead(state, ui.commsOrderId);
+      if (marked.ok) { state = marked.state; persist(); }
+      if (target.dataset.command === 'open-comms') {
+        if (detail.open) detail.close();
+        if (location.hash !== '#comms') location.hash = 'comms';
+        else { render(); queueMicrotask(() => document.querySelector('#comms-messages')?.scrollTo(0, 99999)); }
+        return;
+      }
+      if (ui.page === 'comms') {
+        render();
+        queueMicrotask(() => document.querySelector('#comms-messages')?.scrollTo(0, 99999));
+        return;
+      }
+    }
     if (target.dataset.order) return openDetail(target.dataset.order);
     if (target.dataset.action) return applyAction(target.dataset.action);
     if (target.dataset.resolve) return applyAction('resolve-issue', { issueId: target.dataset.resolve });
@@ -245,7 +312,7 @@
       case 'close-about': document.querySelector('#about-dialog').close(); break;
       case 'reset': document.querySelector('#confirm-dialog').showModal(); break;
       case 'cancel-reset': document.querySelector('#confirm-dialog').close(); break;
-      case 'confirm-reset': state = M.createState(); ui.search = ''; ui.filter = 'all'; ui.overviewFilter = 'all'; persist(); document.querySelector('#confirm-dialog').close(); render(); toast('Исходные заказы восстановлены.'); break;
+      case 'confirm-reset': state = M.createState(); ui.search = ''; ui.filter = 'all'; ui.overviewFilter = 'all'; ui.commsOrderId = 'ЭК-1048'; ui.commsMobileShowThread = false; ui.composeRole = 'manager'; persist(); document.querySelector('#confirm-dialog').close(); render(); toast('Исходные заказы восстановлены.'); break;
       case 'clear-filters': ui.search = ''; ui.filter = 'all'; ui.overviewFilter = 'all'; render(); document.querySelector('#order-search')?.focus(); break;
       case 'menu': {
         const open = document.body.classList.toggle('menu-open');
@@ -255,6 +322,7 @@
         break;
       }
       case 'menu-close': closeMenu(); break;
+      case 'comms-back': ui.commsMobileShowThread = false; render(); break;
     }
   });
   document.addEventListener('change', event => {
@@ -267,6 +335,24 @@
     if (event.target.id === 'order-search') { ui.search = event.target.value; updateResults(); }
   });
   document.addEventListener('submit', event => {
+    if (event.target.id === 'comms-form') {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.target).entries());
+      ui.composeRole = data.role || 'manager';
+      const orderId = event.target.dataset.commsOrder || ui.commsOrderId;
+      const result = M.addMessage(state, orderId, { role: ui.composeRole, text: data.text });
+      if (!result.ok) { toast(result.message, true); return; }
+      state = result.state;
+      const saved = persist();
+      ui.commsMobileShowThread = true;
+      render();
+      queueMicrotask(() => {
+        document.querySelector('#comms-messages')?.scrollTo(0, 99999);
+        document.querySelector('#comms-text')?.focus();
+      });
+      toast(saved ? result.message : `${result.message} Сохранение недоступно.`, !saved);
+      return;
+    }
     if (!['schedule-form', 'issue-form'].includes(event.target.id)) return;
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.target).entries());
@@ -289,8 +375,13 @@
   function route() {
     const next = location.hash.slice(1);
     ui.page = Object.hasOwn(pages, next) ? next : 'overview';
+    if (ui.page === 'comms' && ui.commsOrderId) {
+      const marked = M.markThreadRead(state, ui.commsOrderId);
+      if (marked.ok && marked.state !== state) { state = marked.state; persist(); }
+    }
     render();
     window.scrollTo(0, 0);
+    if (ui.page === 'comms') queueMicrotask(() => document.querySelector('#comms-messages')?.scrollTo(0, 99999));
   }
   window.addEventListener('hashchange', route);
   window.addEventListener('resize', syncMenuAccessibility);

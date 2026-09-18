@@ -25,7 +25,7 @@ cd /Users/konstantindarlin/Documents/Codex/2026-09-16/ye/outputs/ecoluxe/web
 vercel --yes --prod
 ```
 
-Hash-маршруты (`#overview`, `#orders`, …) не требуют SPA-rewrites. `vercel.json` задаёт только заголовки кэша и безопасности.
+Hash-маршруты (`#overview`, `#orders`, `#comms`, …) не требуют SPA-rewrites. `vercel.json` задаёт только заголовки кэша и безопасности.
 
 ## Состав корня деплоя
 

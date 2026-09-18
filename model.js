@@ -7,10 +7,13 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function createEcoModel() {
   'use strict';
 
-  var SCHEMA = 1;
+  var SCHEMA = 2;
   var STAGES = ['production', 'ready', 'scheduled', 'delivered', 'installation', 'accepted'];
   var SEED_IDS = ['ЭК-1048', 'ЭК-1049', 'ЭК-1050', 'ЭК-1051', 'ЭК-1052', 'ЭК-1053'];
   var VISIT_START = '2026-09-21';
+  var COMM_ROLES = ['client', 'manager', 'production', 'logistics', 'crew'];
+  var COMM_CHANNELS = ['hub', 'whatsapp', 'call', 'email'];
+  var COMM_KINDS = ['message', 'system'];
 
   function part(id, name, qty, ready) {
     return { id: id, name: name, qty: qty, ready: ready };
@@ -32,6 +35,55 @@
 
   function history(time, text) {
     return { time: time, text: text };
+  }
+
+  function msg(id, orderId, role, author, channel, time, text, kind, unread) {
+    return {
+      id: id,
+      orderId: orderId,
+      role: role,
+      author: author,
+      channel: channel,
+      time: time,
+      text: text,
+      kind: kind || 'message',
+      unread: !!unread
+    };
+  }
+
+  function seedComms() {
+    return [
+      msg('c1048-01', 'ЭК-1048', 'client', 'Клиент «Терра»', 'whatsapp', '2026-09-18T07:42:00.000Z',
+        'Здравствуйте! Подскажите, когда кухня будет готова к отгрузке? Очень ждём монтаж.', 'message', false),
+      msg('c1048-02', 'ЭК-1048', 'manager', 'Анна · менеджер', 'hub', '2026-09-18T08:05:00.000Z',
+        'Приняли вопрос в единую ленту заказа. Производство — статус по фасадам ЭК-1048?', 'message', false),
+      msg('c1048-03', 'ЭК-1048', 'production', 'Цех · участок №2', 'hub', '2026-09-18T09:18:00.000Z',
+        'Фасады ещё в окраске: сдвиг примерно на сутки. Корпуса, столешница и ящики уже готовы.', 'message', false),
+      msg('c1048-04', 'ЭК-1048', 'manager', 'Система', 'hub', '2026-09-18T09:19:00.000Z',
+        'Комплект: 4 из 5 групп. Фасады в работе.', 'system', false),
+      msg('c1048-05', 'ЭК-1048', 'production', 'Цех · участок №2', 'hub', '2026-09-18T11:40:00.000Z',
+        'Фасады готовы, передаём на комплектацию. Можно готовить выезд.', 'message', false),
+      msg('c1048-06', 'ЭК-1048', 'logistics', 'Логистика', 'hub', '2026-09-18T12:10:00.000Z',
+        'Бригада «Север» свободна 24.09 с 10:00. Подтверждаю слот для доставки и монтажа?', 'message', false),
+      msg('c1048-07', 'ЭК-1048', 'manager', 'Анна · менеджер', 'hub', '2026-09-18T12:22:00.000Z',
+        'Слот держим. Клиенту сообщим после вашего ОК.', 'message', false),
+      msg('c1048-08', 'ЭК-1048', 'client', 'Клиент «Терра»', 'whatsapp', '2026-09-18T13:05:00.000Z',
+        'Можно ли перенести доставку на вечер пятницы? Домофон 12Б.', 'message', true),
+
+      msg('c1050-01', 'ЭК-1050', 'manager', 'Анна · менеджер', 'hub', '2026-09-18T10:12:00.000Z',
+        'Комплектность подтверждена. Готовим назначение выезда.', 'message', false),
+      msg('c1050-02', 'ЭК-1050', 'logistics', 'Логистика', 'hub', '2026-09-18T10:45:00.000Z',
+        'Ищем бригаду на 25.09. Вернусь с слотом сегодня.', 'message', false),
+      msg('c1050-03', 'ЭК-1050', 'production', 'Система', 'hub', '2026-09-18T10:05:00.000Z',
+        'Комплект подтверждён.', 'system', false),
+
+      msg('c1051-01', 'ЭК-1051', 'logistics', 'Логистика', 'hub', '2026-09-18T10:35:00.000Z',
+        'Выезд 23.09 в 11:00 · бригада «Север» закреплён.', 'message', false),
+      msg('c1051-02', 'ЭК-1051', 'crew', 'Бригада «Север»', 'hub', '2026-09-18T11:02:00.000Z',
+        'Приняли. На объекте будем с 10:45, нужна парковка у подъезда.', 'message', false),
+      msg('c1051-03', 'ЭК-1051', 'client', 'Клиент «Каскад»', 'email', '2026-09-18T11:40:00.000Z',
+        'Ждём вас. Домофон 19В, охрана предупреждена.', 'message', false)
+    ];
   }
 
   function createState() {
@@ -179,7 +231,8 @@
           schedule: { date: '2026-09-21', time: '16:00', crew: 'Бригада «Юг»' },
           history: [history('2026-09-21T16:25Z', 'Работа принята по чек-листу.')]
         }
-      ]
+      ],
+      comms: seedComms()
     };
   }
 
@@ -197,8 +250,118 @@
       issues: state.orders.reduce(function (count, order) {
         return count + order.issues.filter(function (issue) { return !issue.resolved; }).length;
       }, 0),
-      accepted: state.orders.filter(function (order) { return order.stage === 'accepted'; }).length
+      accepted: state.orders.filter(function (order) { return order.stage === 'accepted'; }).length,
+      openDialogs: getOpenDialogOrderIds(state).length,
+      unreadComms: getUnreadCount(state)
     };
+  }
+
+  function getComms(state, orderId) {
+    var list = (state.comms || []).filter(function (item) {
+      return !orderId || item.orderId === orderId;
+    });
+    return list.slice().sort(function (a, b) {
+      return Date.parse(a.time) - Date.parse(b.time);
+    });
+  }
+
+  function getOpenDialogOrderIds(state) {
+    var ids = {};
+    (state.comms || []).forEach(function (item) {
+      ids[item.orderId] = true;
+    });
+    return Object.keys(ids).filter(function (id) {
+      var order = getOrder(state, id);
+      return order && order.stage !== 'accepted';
+    });
+  }
+
+  function getUnreadCount(state, orderId) {
+    return (state.comms || []).filter(function (item) {
+      return item.unread && (!orderId || item.orderId === orderId);
+    }).length;
+  }
+
+  function getThreadMeta(state) {
+    return getOpenDialogOrderIds(state).concat(
+      Object.keys((state.comms || []).reduce(function (acc, item) {
+        acc[item.orderId] = true;
+        return acc;
+      }, {})).filter(function (id) {
+        return getOpenDialogOrderIds(state).indexOf(id) === -1;
+      })
+    ).map(function (orderId) {
+      var order = getOrder(state, orderId);
+      var messages = getComms(state, orderId);
+      var last = messages[messages.length - 1];
+      return {
+        orderId: orderId,
+        order: order,
+        messages: messages,
+        last: last,
+        unread: getUnreadCount(state, orderId)
+      };
+    }).filter(function (thread) {
+      return thread.order && thread.messages.length;
+    }).sort(function (a, b) {
+      return Date.parse(b.last.time) - Date.parse(a.last.time);
+    });
+  }
+
+  function addMessage(state, orderId, payload) {
+    payload = payload || {};
+    if (!validateState(state)) return { ok: false, state: state, message: 'Состояние не прошло проверку.' };
+    var order = getOrder(state, orderId);
+    if (!order) return { ok: false, state: state, message: 'Заказ не найден.' };
+    var text = typeof payload.text === 'string' ? payload.text.trim() : '';
+    if (!text) return { ok: false, state: state, message: 'Введите текст сообщения.' };
+    var role = COMM_ROLES.indexOf(payload.role) !== -1 ? payload.role : 'manager';
+    var author = isNonEmptyString(payload.author) ? payload.author.trim() : defaultAuthor(role);
+    var kind = payload.kind === 'system' ? 'system' : 'message';
+    var nextMsg = msg(
+      'c-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1000),
+      orderId,
+      role,
+      author,
+      'hub',
+      eventTime(),
+      text,
+      kind,
+      false
+    );
+    var next = {
+      schema: state.schema,
+      orders: state.orders,
+      comms: state.comms.concat(nextMsg)
+    };
+    if (!validateState(next)) return { ok: false, state: state, message: 'Не удалось сохранить сообщение.' };
+    return { ok: true, state: next, message: 'Сообщение отправлено в центр.', messageId: nextMsg.id };
+  }
+
+  function markThreadRead(state, orderId) {
+    if (!validateState(state)) return { ok: false, state: state, message: 'Состояние не прошло проверку.' };
+    var changed = false;
+    var nextComms = state.comms.map(function (item) {
+      if (item.orderId === orderId && item.unread) {
+        changed = true;
+        return Object.assign({}, item, { unread: false });
+      }
+      return item;
+    });
+    if (!changed) return { ok: true, state: state, message: 'Уже прочитано.' };
+    var next = { schema: state.schema, orders: state.orders, comms: nextComms };
+    if (!validateState(next)) return { ok: false, state: state, message: 'Не удалось обновить прочтение.' };
+    return { ok: true, state: next, message: 'Диалог прочитан.' };
+  }
+
+  function defaultAuthor(role) {
+    return {
+      client: 'Клиент',
+      manager: 'Менеджер',
+      production: 'Производство',
+      logistics: 'Логистика',
+      crew: 'Бригада'
+    }[role] || 'Команда';
   }
 
   function isPlainObject(value) {
@@ -241,6 +404,15 @@
       isNonEmptyString(value.time) && isNonEmptyString(value.text) && !Number.isNaN(Date.parse(value.time));
   }
 
+  function isCommsMessage(value) {
+    return isPlainObject(value) &&
+      hasOnlyKeys(value, ['id', 'orderId', 'role', 'author', 'channel', 'time', 'text', 'kind', 'unread']) &&
+      isNonEmptyString(value.id) && isNonEmptyString(value.orderId) && isNonEmptyString(value.author) &&
+      isNonEmptyString(value.text) && isNonEmptyString(value.time) && !Number.isNaN(Date.parse(value.time)) &&
+      COMM_ROLES.indexOf(value.role) !== -1 && COMM_CHANNELS.indexOf(value.channel) !== -1 &&
+      COMM_KINDS.indexOf(value.kind) !== -1 && typeof value.unread === 'boolean';
+  }
+
   function hasUniqueIds(items) {
     var ids = items.map(function (item) { return item.id; });
     return ids.length === new Set(ids).size;
@@ -277,9 +449,11 @@
   }
 
   function validateState(candidate) {
-    if (!isPlainObject(candidate) || !hasOnlyKeys(candidate, ['schema', 'orders']) || candidate.schema !== SCHEMA || !Array.isArray(candidate.orders) || candidate.orders.length !== 6) return false;
+    if (!isPlainObject(candidate) || !hasOnlyKeys(candidate, ['schema', 'orders', 'comms']) || candidate.schema !== SCHEMA || !Array.isArray(candidate.orders) || candidate.orders.length !== 6) return false;
+    if (!Array.isArray(candidate.comms) || !candidate.comms.every(isCommsMessage) || !hasUniqueIds(candidate.comms)) return false;
     if (!candidate.orders.every(isOrder) || !hasUniqueIds(candidate.orders)) return false;
     if (!candidate.orders.every(function (order) { return SEED_IDS.indexOf(order.id) !== -1; })) return false;
+    if (!candidate.comms.every(function (item) { return SEED_IDS.indexOf(item.orderId) !== -1; })) return false;
     var visits = new Set();
     return candidate.orders.every(function (order) {
       if (!order.schedule || order.stage === 'accepted') return true;
@@ -307,7 +481,7 @@
         history: next.history.concat(history(eventTime(), text))
       };
     });
-    return { schema: state.schema, orders: nextOrders };
+    return { schema: state.schema, orders: nextOrders, comms: state.comms || [] };
   }
 
   function getOrder(state, orderId) {
@@ -435,6 +609,12 @@
     transition: transition,
     getReadiness: getReadiness,
     getStats: getStats,
-    validateState: validateState
+    validateState: validateState,
+    getComms: getComms,
+    addMessage: addMessage,
+    markThreadRead: markThreadRead,
+    getUnreadCount: getUnreadCount,
+    getThreadMeta: getThreadMeta,
+    getOpenDialogOrderIds: getOpenDialogOrderIds
   };
 }));
