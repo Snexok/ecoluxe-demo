@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#30352e">
+  <title>ЭКОЛЮКС — рабочее пространство</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2330352e'/%3E%3Ctext x='16' y='23' font-size='24' text-anchor='middle' fill='%23c7a36c'%3EЭ%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script src="model.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Перейти к содержимому</a>
+  <div id="app"></div>
+  <dialog id="detail" aria-labelledby="detail-title"></dialog>
+  <dialog id="confirm-dialog" class="small-dialog" aria-labelledby="confirm-title">
+    <div class="modal-pad"><span class="eyebrow">Демонстрация</span><h2 id="confirm-title">Начать с чистого листа?</h2><p>Изменения в тестовых заказах будут удалены. Вернутся шесть исходных заказов.</p><div class="button-row"><button class="button" data-command="cancel-reset">Отмена</button><button class="button primary" data-command="confirm-reset">Сбросить демо</button></div></div>
+  </dialog>
+  <dialog id="about-dialog" class="small-dialog" aria-labelledby="about-title">
+    <div class="modal-pad"><div class="section-heading"><span class="eyebrow">Основа концепта</span><button class="icon-button" data-command="close-about" aria-label="Закрыть информацию">×</button></div><h2 id="about-title">Под процессы ЭКОЛЮКС</h2><p>На сайте компании описаны собственное производство, доставка и монтаж с проверкой комплектности и актом приёмки. Мы объединили эти этапы в одной карточке заказа.</p><p>Это независимое предложение интерфейса. Заказы, люди и показатели вымышлены. Внутренние процессы и используемые системы компании требуют уточнения.</p><div class="source-links"><a href="https://mebelecoluxe.ru/" target="_blank" rel="noopener">Сайт компании ↗</a><a href="https://mebelecoluxe.ru/uslugi/montazh/" target="_blank" rel="noopener">Доставка и монтаж ↗</a><a href="./research.html" target="_blank">Исследование и вопросы ↗</a></div><p class="caption">Публичные источники проверены 18 сентября 2026. Фотографии кухонь — с официального сайта; они иллюстрируют концепт.</p></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
